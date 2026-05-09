@@ -78,17 +78,27 @@
         </label>
       </div>
       <div id="onlineCreate" class="hidden online-box">
+        <label class="field"><span>Your name</span>
+          <input type="text" id="hostNameInput" maxlength="14" placeholder="Host" />
+        </label>
         <p>Your room code:</p>
         <div class="room-code" id="roomCodeDisplay">······</div>
-        <button class="btn ghost" id="btnCopyCode">📋 Copy code</button>
+        <div class="online-actions">
+          <button class="btn ghost" id="btnCopyCode">📋 Copy code</button>
+          <button class="btn ghost" id="btnShareLink">🔗 Share link</button>
+        </div>
         <p class="status" id="onlineStatus">Initializing…</p>
+        <p class="hint">Share the code or link with friends. They open the same game URL and tap <b>Join Online Room</b>.</p>
         <ul class="lobby" id="lobbyList"></ul>
       </div>
       <div id="onlineJoin" class="hidden online-box">
-        <label class="field"><span>Room code</span>
-          <input type="text" id="joinCodeInput" maxlength="6" placeholder="ABC123" autocapitalize="characters" />
+        <label class="field"><span>Your name</span>
+          <input type="text" id="joinNameInput" maxlength="14" placeholder="Player" />
         </label>
-        <button class="btn primary" id="btnDoJoin">Join Room</button>
+        <label class="field"><span>Room code</span>
+          <input type="text" id="joinCodeInput" maxlength="6" placeholder="ABC123" autocapitalize="characters" inputmode="text" autocomplete="off" />
+        </label>
+        <button class="btn primary big" id="btnDoJoin">Join Room</button>
         <p class="status" id="joinStatus"></p>
       </div>
       <button class="btn primary big" id="btnStartGame">Start Game</button>
