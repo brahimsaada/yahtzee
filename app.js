@@ -913,9 +913,6 @@ const renderActions = () => {
 
 const renderScoresheet = () => {
   const sheet = $('#scoresheet');
-  const cols = G.players.length + 1;
-  const sectionRow = (label) => `<tr class="section-head"><td class="cat-name">${label}</td><td colspan="${cols-1}"></td></tr>`;
-
   let html = '<table><thead><tr><th class="cat-head"></th>';
   G.players.forEach((p, i) => {
     const activeCls = i === G.active ? ' col-active' : '';
@@ -923,25 +920,25 @@ const renderScoresheet = () => {
   });
   html += '</tr></thead><tbody>';
 
-  html += sectionRow('Upper');
+  // Upper section (no header row)
   CATEGORIES.filter(c => c.section === 'upper').forEach(cat => {
     html += `<tr class="cat-row"><td class="cat-name" title="${cat.help}">${cat.name}</td>`;
     G.players.forEach((p, i) => html += scoreCellHtml(cat, i));
     html += '</tr>';
   });
 
-  html += `<tr class="subtotal"><td class="cat-name">Subtotal</td>`;
-  G.players.forEach((_, i) => html += `<td class="${i===G.active?'col-active':''}">${upperTotal(G.sheets[i])}</td>`);
-  html += '</tr><tr class="bonus-row"><td class="cat-name">Bonus +35</td>';
+  // Combined Subtotal + Bonus row
+  html += `<tr class="subtotal-bonus"><td class="cat-name">Sub + Bonus</td>`;
   G.players.forEach((_, i) => {
     const t = upperTotal(G.sheets[i]);
     const earned = t >= 63;
-    const cls = (i===G.active?'col-active ':'') + (earned ? 'bonus-earned' : '');
-    html += `<td class="${cls}">${earned ? '+35' : `${t}/63`}</td>`;
+    const cls = (i === G.active ? 'col-active ' : '') + (earned ? 'bonus-earned' : '');
+    const display = earned ? `${t} <span class="bonus-add">+35</span>` : `${t}<span class="bonus-target">/63</span>`;
+    html += `<td class="${cls}">${display}</td>`;
   });
   html += '</tr>';
 
-  html += sectionRow('Lower');
+  // Lower section (no header row)
   CATEGORIES.filter(c => c.section === 'lower').forEach(cat => {
     html += `<tr class="cat-row"><td class="cat-name" title="${cat.help}">${cat.name}</td>`;
     G.players.forEach((p, i) => html += scoreCellHtml(cat, i));
@@ -953,7 +950,6 @@ const renderScoresheet = () => {
   html += '</tr></tbody></table>';
   sheet.innerHTML = html;
 
-  // Attach preview click handlers
   $$('.preview', sheet).forEach(td => td.addEventListener('click', () => selectCategory(td.dataset.cat)));
 };
 
