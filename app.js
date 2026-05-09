@@ -861,10 +861,13 @@ const renderPlayersRail = () => {
   G.players.forEach((p, i) => {
     const chip = document.createElement('div');
     chip.className = 'player-chip' + (i === G.active ? ' active' : '') + (p.isYou ? ' you' : '') + (p.connected === false ? ' disconnected' : '');
+    const initial = (p.name[0]||'?').toUpperCase();
     chip.innerHTML = `
-      <div class="player-chip__avatar" style="background:${p.color}">${(p.name[0]||'?').toUpperCase()}${p.isAI?'🤖':''}</div>
-      <div class="player-chip__name" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</div>
-      <div class="player-chip__score">${grandTotal(G.sheets[i])}</div>
+      <div class="player-chip__avatar" style="background:${p.color}">${p.isAI ? '🤖' : initial}</div>
+      <div class="player-chip__info">
+        <div class="player-chip__name" title="${escapeHtml(p.name)}">${escapeHtml(p.name)}</div>
+        <div class="player-chip__score">${grandTotal(G.sheets[i])}</div>
+      </div>
     `;
     rail.appendChild(chip);
   });
@@ -910,38 +913,47 @@ const renderActions = () => {
 
 const renderScoresheet = () => {
   const sheet = $('#scoresheet');
-  const sectionRow = (label) => `<tr class="section-head"><td colspan="${G.players.length+1}">${label}</td></tr>`;
-  let html = '<table><thead><tr><th class="cat-head">Category</th>';
+  const cols = G.players.length + 1;
+  const sectionRow = (label) => `<tr class="section-head"><td class="cat-name">${label}</td><td colspan="${cols-1}"></td></tr>`;
+
+  let html = '<table><thead><tr><th class="cat-head"></th>';
   G.players.forEach((p, i) => {
-    html += `<th style="color:${p.color}">${escapeHtml(p.name)}${i===G.active?' ●':''}</th>`;
+    const activeCls = i === G.active ? ' col-active' : '';
+    html += `<th class="${activeCls}" style="color:${p.color}" title="${escapeHtml(p.name)}">${escapeHtml(p.name).slice(0,8)}</th>`;
   });
   html += '</tr></thead><tbody>';
-  html += sectionRow('Upper Section');
+
+  html += sectionRow('Upper');
   CATEGORIES.filter(c => c.section === 'upper').forEach(cat => {
-    html += `<tr><td class="cat-name" title="${cat.help}">${cat.name}</td>`;
+    html += `<tr class="cat-row"><td class="cat-name" title="${cat.help}">${cat.name}</td>`;
     G.players.forEach((p, i) => html += scoreCellHtml(cat, i));
     html += '</tr>';
   });
+
   html += `<tr class="subtotal"><td class="cat-name">Subtotal</td>`;
-  G.players.forEach((_, i) => html += `<td>${upperTotal(G.sheets[i])}</td>`);
-  html += '</tr><tr class="bonus-row"><td class="cat-name">Bonus (≥63)</td>';
+  G.players.forEach((_, i) => html += `<td class="${i===G.active?'col-active':''}">${upperTotal(G.sheets[i])}</td>`);
+  html += '</tr><tr class="bonus-row"><td class="cat-name">Bonus +35</td>';
   G.players.forEach((_, i) => {
     const t = upperTotal(G.sheets[i]);
-    html += `<td>${t >= 63 ? '+35' : `${t}/63`}</td>`;
+    const earned = t >= 63;
+    const cls = (i===G.active?'col-active ':'') + (earned ? 'bonus-earned' : '');
+    html += `<td class="${cls}">${earned ? '+35' : `${t}/63`}</td>`;
   });
   html += '</tr>';
-  html += sectionRow('Lower Section');
+
+  html += sectionRow('Lower');
   CATEGORIES.filter(c => c.section === 'lower').forEach(cat => {
-    html += `<tr><td class="cat-name" title="${cat.help}">${cat.name}</td>`;
+    html += `<tr class="cat-row"><td class="cat-name" title="${cat.help}">${cat.name}</td>`;
     G.players.forEach((p, i) => html += scoreCellHtml(cat, i));
     html += '</tr>';
   });
-  html += '<tr class="total"><td class="cat-name">TOTAL</td>';
-  G.players.forEach((_, i) => html += `<td>${grandTotal(G.sheets[i])}</td>`);
+
+  html += '<tr class="total"><td class="cat-name">Total</td>';
+  G.players.forEach((_, i) => html += `<td class="${i===G.active?'col-active':''}">${grandTotal(G.sheets[i])}</td>`);
   html += '</tr></tbody></table>';
   sheet.innerHTML = html;
 
-  // attach preview click handlers
+  // Attach preview click handlers
   $$('.preview', sheet).forEach(td => td.addEventListener('click', () => selectCategory(td.dataset.cat)));
 };
 
