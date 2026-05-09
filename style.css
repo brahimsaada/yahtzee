@@ -478,7 +478,7 @@ kbd { font-family: 'JetBrains Mono', monospace; font-size: .82em; background: va
 }
 .rolls-left .pip-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--gold); transition: all .3s var(--tx); }
 .rolls-left .pip-dot.used { background: transparent; border: 1px solid var(--border-hi); }
-.actions { display: flex; justify-content: center; gap: .75rem; flex-wrap: wrap; }
+.actions { justify-content: center; gap: .75rem; flex-wrap: wrap; }
 
 /* ============ SCORESHEET ============ */
 .scoresheet {
