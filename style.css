@@ -472,10 +472,10 @@ kbd { font-family: 'JetBrains Mono', monospace; font-size: .82em; background: va
 }
 .scoresheet table { border-collapse: separate; border-spacing: 0; width: 100%; min-width: 100%; }
 .scoresheet th, .scoresheet td {
-  padding: .25em .65em; text-align: center;
+  padding: .15em .55em; text-align: center;
   font-family: 'JetBrains Mono', monospace; font-size: .9rem;
   border-bottom: 1px solid var(--border);
-  height: 30px;
+  height: 26px;
 }
 .scoresheet th {
   font-family: 'Fraunces', serif; font-weight: 600;
@@ -483,7 +483,7 @@ kbd { font-family: 'JetBrains Mono', monospace; font-size: .82em; background: va
   position: sticky; top: 0; z-index: 2;
   font-size: .82rem; padding: .45em .5em;
   border-bottom: 2px solid var(--border-hi);
-  height: 36px;
+  height: 30px;
 }
 .scoresheet th.cat-head { text-align: left; min-width: 110px; left: 0; z-index: 3; background: var(--bg-2); font-size: .7rem; letter-spacing: .1em; text-transform: uppercase; color: var(--text-dim); font-weight: 500; }
 .scoresheet td.cat-name {
@@ -505,32 +505,34 @@ kbd { font-family: 'JetBrains Mono', monospace; font-size: .82em; background: va
 .scoresheet tr.section-head td.cat-name { background: linear-gradient(90deg, rgba(168,119,42,.35), rgba(168,119,42,.15)); }
 
 /* SUBTOTAL row: secondary emphasis */
-.scoresheet tr.subtotal td {
-  background: rgba(255,255,255,.04);
-  font-weight: 700; font-size: 1rem;
-  border-top: 1px solid var(--border-hi);
-  height: 32px;
-}
-.scoresheet tr.subtotal td.cat-name { color: var(--text); font-style: italic; font-size: .78rem; }
-[data-theme="light"] .scoresheet tr.subtotal td { background: rgba(0,0,0,.04); }
-
-/* BONUS row: gold highlight */
-.scoresheet tr.bonus-row td {
+/* Combined SUBTOTAL + BONUS row */
+.scoresheet tr.subtotal-bonus td {
   background: rgba(212,161,74,.10);
-  font-style: normal; font-size: .8rem; height: 26px;
+  font-weight: 700; font-size: .95rem;
+  height: 30px;
+  border-top: 1px solid var(--border-hi);
   color: var(--gold-soft);
-  font-weight: 600;
 }
-.scoresheet tr.bonus-row td.cat-name { color: var(--gold); font-size: .72rem; }
-.scoresheet tr.bonus-row td.bonus-earned { color: var(--gold); font-weight: 700; font-size: .95rem; animation: bonusFlash .6s var(--tx); }
-@keyframes bonusFlash { 0% { background: rgba(212,161,74,.5); } 100% { background: rgba(212,161,74,.10); } }
-
+.scoresheet tr.subtotal-bonus td.cat-name {
+  color: var(--gold); font-style: italic;
+  font-size: .75rem; font-weight: 600;
+}
+.scoresheet tr.subtotal-bonus .bonus-add {
+  color: var(--gold); font-weight: 800; margin-left: .15em;
+  animation: bonusFlash .6s var(--tx);
+}
+.scoresheet tr.subtotal-bonus .bonus-target {
+  color: var(--text-mute); font-size: .8em; margin-left: .1em;
+}
+.scoresheet tr.subtotal-bonus td.bonus-earned { color: var(--gold); }
+@keyframes bonusFlash { 0% { background: rgba(212,161,74,.5); } 100% { background: transparent; } }
+[data-theme="light"] .scoresheet tr.subtotal-bonus td { background: rgba(168,119,42,.12); }
 /* TOTAL row: primary emphasis - the big payoff */
 .scoresheet tr.total td {
   background: linear-gradient(90deg, var(--gold-deep), var(--gold) 60%, var(--gold-soft));
   color: #1a1208;
-  font-size: 1.2rem; font-weight: 800;
-  height: 44px;
+  font-size: 1.05rem; font-weight: 800;
+  height: 36px;
   border-top: 2px solid var(--gold);
   letter-spacing: -.02em;
   position: sticky; bottom: 0; z-index: 1;
@@ -704,13 +706,12 @@ kbd { font-family: 'JetBrains Mono', monospace; font-size: .82em; background: va
 
   /* Scoresheet on phones: smaller, sticky first col still works */
   .scoresheet { border-radius: 18px; }
-  .scoresheet th, .scoresheet td { padding: .25em .4em; font-size: .78rem; height: 28px; }
-  .scoresheet th.cat-head, .scoresheet td.cat-name { min-width: 88px; font-size: .75rem; }
-  .scoresheet tr.section-head td { padding-left: .75em; font-size: .62rem; height: 22px; }
-  .scoresheet tr.subtotal td { font-size: .9rem; }
-  .scoresheet tr.bonus-row td { font-size: .72rem; height: 24px; }
-  .scoresheet tr.total td { font-size: 1rem; height: 36px; }
-  .scoresheet tr.total td.cat-name { font-size: .75rem; }
+  .scoresheet th, .scoresheet td { padding: .1em .35em; font-size: .76rem; height: 24px; }
+  .scoresheet th.cat-head, .scoresheet td.cat-name { min-width: 84px; font-size: .72rem; }
+  .scoresheet tr.subtotal-bonus td { font-size: .82rem; height: 26px; }
+  .scoresheet tr.subtotal-bonus td.cat-name { font-size: .68rem; }
+  .scoresheet tr.total td { font-size: .92rem; height: 30px; }
+  .scoresheet tr.total td.cat-name { font-size: .72rem; }
 
   /* Modal: full-screen feel on phones */
   .modal { padding: 0; align-items: flex-end; }
