@@ -177,17 +177,22 @@ kbd { font-family: 'JetBrains Mono', monospace; font-size: .82em; background: va
 .seg button.active { background: var(--gold); color: #1a1208; font-weight: 600; }
 
 .online-box { padding: 1rem; background: var(--surface-2); border-radius: var(--r); display: grid; gap: .75rem; }
+.online-actions { display: flex; gap: .5rem; flex-wrap: wrap; justify-content: center; }
+.hint { font-size: .85rem; color: var(--text-mute); text-align: center; line-height: 1.5; }
 .room-code {
   font-family: 'JetBrains Mono', monospace; font-size: 2.2rem; font-weight: 600;
   letter-spacing: .25em; text-align: center; color: var(--gold);
   padding: .75rem; background: var(--bg-2); border-radius: var(--r); border: 1px dashed var(--border-hi);
+  user-select: all; -webkit-user-select: all;
 }
 .status { font-size: .9rem; color: var(--text-dim); text-align: center; min-height: 1.2em; }
 .status.error { color: var(--danger); }
 .status.success { color: var(--success); }
 .lobby { list-style: none; display: grid; gap: .35rem; }
-.lobby li { display: flex; align-items: center; gap: .6rem; padding: .5em .75em; background: var(--surface); border-radius: 8px; font-size: .95rem; }
-.lobby li::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--success); box-shadow: 0 0 8px var(--success); }
+.lobby li { display: flex; align-items: center; gap: .6rem; padding: .55em .8em; background: var(--surface); border-radius: 10px; font-size: .95rem; border: 1px solid var(--border); }
+.lobby li::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--success); box-shadow: 0 0 8px var(--success); flex-shrink: 0; }
+.lobby__dot { width: 14px; height: 14px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+.lobby em { font-style: normal; color: var(--text-mute); font-size: .85rem; }
 
 /* ============ GAME SCREEN ============ */
 .screen--game { padding: .75rem; gap: .75rem; max-width: 1280px; margin: 0 auto; width: 100%; }
@@ -375,22 +380,142 @@ kbd { font-family: 'JetBrains Mono', monospace; font-size: .82em; background: va
 /* ============ CONFETTI ============ */
 .confetti { position: fixed; inset: 0; pointer-events: none; z-index: 150; }
 
-/* ============ RESPONSIVE ============ */
-@media (max-width: 720px) {
-  .die { width: 54px; height: 54px; padding: 8px; gap: 3px; border-radius: 11px; }
-  .pip { width: 7px; height: 7px; }
-  .scoresheet th, .scoresheet td { padding: .4em .5em; font-size: .8rem; }
+/* ============ RESPONSIVE ============
+   Breakpoints:
+   ≤900px → tablet/large phone landscape: tighten paddings
+   ≤640px → phone: compact layout, smaller dice, fixed bottom action bar
+   ≤380px → small phone: ultra-compact
+   ============ */
+@media (max-width: 900px) {
+  .screen--game { padding: .5rem; gap: .5rem; }
+  .scoresheet th, .scoresheet td { padding: .45em .55em; font-size: .82rem; }
   .scoresheet th.cat-head, .scoresheet td.cat-name { min-width: 110px; }
-  .play-area { padding: 1rem .75rem; }
-  .brand__title { font-size: 2.5rem; }
-  .modal__panel { padding: 1.25rem; }
+  .card { padding: 1.5rem; }
+  .play-area { padding: 1.25rem .75rem; }
 }
-@media (max-width: 480px) {
-  .die { width: 46px; height: 46px; padding: 6px; gap: 2px; border-radius: 9px; }
+
+@media (max-width: 640px) {
+  html { font-size: 15px; }
+
+  .screen--start { padding: 1.25rem .75rem 5.5rem; gap: 1.5rem; min-height: 100dvh; justify-content: flex-start; padding-top: 2.5rem; }
+  .brand__title { font-size: 2.25rem; }
+  .brand__title span { font-size: .4em; letter-spacing: .35em; margin-top: .6em; }
+  .brand__tag { font-size: .95rem; margin-top: .75rem; }
+  .brand__mark svg { width: 52px; height: 52px; }
+  .foot { display: none; }
+
+  .card { padding: 1.25rem 1rem; border-radius: 18px; max-width: 100%; }
+  .menu__btn { padding: .85rem 1rem; gap: .75rem; }
+  .menu__btn b { font-size: 1rem; }
+  .menu__btn em { font-size: .8rem; }
+  .menu__icon { font-size: 1.5rem; }
+  .menu__foot { gap: .15rem; }
+  .menu__foot .link { font-size: .8rem; padding: .4em .6em; }
+
+  .screen--setup { padding: 1.25rem .75rem; }
+  .back { top: .5rem; left: .5rem; }
+  .room-code { font-size: 1.7rem; letter-spacing: .2em; padding: .6rem; }
+  .field input[type="text"] { font-size: 1rem; padding: .75em .9em; }
+
+  /* Game screen: tighter, with bottom-fixed actions */
+  .screen--game { padding: .4rem; gap: .4rem; padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
+  .topbar { padding: 0; gap: .5rem; }
+  .icon { width: 40px; height: 40px; font-size: 1.15rem; }
+  .turn-info__round { font-size: .7rem; }
+  .turn-info__active { font-size: 1.05rem; }
+
+  /* Player chips: compact horizontal scroll */
+  .players-rail { gap: .35rem; padding: .15rem; }
+  .player-chip { min-width: 64px; padding: .4rem .5rem; }
+  .player-chip__avatar { width: 26px; height: 26px; font-size: .75rem; }
+  .player-chip__name { font-size: .7rem; max-width: 64px; }
+  .player-chip__score { font-size: .9rem; }
+  .player-chip.you::before { font-size: .5rem; padding: 1px 5px; top: -7px; }
+
+  /* Play area */
+  .play-area { padding: 1rem .5rem; gap: .75rem; border-radius: 18px; }
+  .dice-tray { gap: .5rem; min-height: 60px; }
+  .die { width: 52px; height: 52px; padding: 7px; gap: 3px; border-radius: 11px; }
+  .pip { width: 7px; height: 7px; }
+  .rolls-left { font-size: .8rem; }
+  .rolls-left .pip-dot { width: 8px; height: 8px; }
+
+  /* Action buttons: fixed bottom bar */
+  .actions {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    background: var(--bg-2); border-top: 1px solid var(--border);
+    padding: .75rem .75rem calc(.75rem + env(safe-area-inset-bottom));
+    z-index: 50; box-shadow: 0 -8px 24px rgba(0,0,0,.25);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    background: rgba(10, 31, 28, .85);
+  }
+  [data-theme="light"] .actions { background: rgba(244, 237, 224, .9); }
+  [data-theme="midnight"] .actions { background: rgba(6, 8, 20, .9); }
+  .actions .btn { flex: 1; font-size: .95rem; padding: .9em 1rem; }
+  .btn.big { padding: .9em 1rem; font-size: .95rem; }
+
+  /* Scoresheet on phones: smaller, sticky first col still works */
+  .scoresheet { border-radius: 18px; }
+  .scoresheet th, .scoresheet td { padding: .35em .4em; font-size: .72rem; }
+  .scoresheet th.cat-head, .scoresheet td.cat-name { min-width: 92px; font-size: .8rem; }
+  .scoresheet tr.section-head td { padding-left: .75em; font-size: .7rem; }
+
+  /* Modal: full-screen feel on phones */
+  .modal { padding: 0; align-items: flex-end; }
+  .modal__panel { padding: 1.5rem 1.25rem; max-height: 92vh; border-radius: 22px 22px 0 0; animation: slideUp .35s var(--tx); }
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: none; } }
+  .modal__body h2 { font-size: 1.4rem; }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); gap: .5rem; }
+  .stat-card { padding: .75rem; }
+  .stat-card b { font-size: 1.5rem; }
+
+  /* Lobby */
+  .online-box { padding: .85rem; }
+  .online-actions { gap: .35rem; }
+  .online-actions .btn { font-size: .85rem; padding: .65em 1em; flex: 1; }
+
+  /* Player setup rows */
+  .player-row { padding: .5rem .65rem; gap: .5rem; }
+  .player-row__avatar { width: 32px; height: 32px; font-size: .85rem; }
+  .player-row select { font-size: .85rem; padding: .25em .4em; }
+
+  /* Toast */
+  .toast-stack { top: .5rem; max-width: calc(100% - 1rem); }
+  .toast { font-size: .85rem; padding: .6em 1em; }
+}
+
+@media (max-width: 380px) {
+  html { font-size: 14px; }
+  .die { width: 46px; height: 46px; padding: 6px; gap: 2px; border-radius: 10px; }
   .pip { width: 6px; height: 6px; }
-  .menu__btn { padding: .85rem 1rem; }
-  .menu__icon { font-size: 1.4rem; }
+  .dice-tray { gap: .4rem; }
+  .player-chip { min-width: 58px; padding: .35rem .4rem; }
+  .player-chip__avatar { width: 24px; height: 24px; }
+  .scoresheet th, .scoresheet td { padding: .3em .35em; font-size: .68rem; }
+  .scoresheet th.cat-head, .scoresheet td.cat-name { min-width: 82px; font-size: .75rem; }
+  .room-code { font-size: 1.4rem; letter-spacing: .15em; }
+  .brand__title { font-size: 1.9rem; }
+  .actions .btn { font-size: .9rem; }
 }
+
+/* Landscape phone: keep things tight vertically */
+@media (max-height: 480px) and (orientation: landscape) {
+  .screen--game { padding: .35rem; gap: .35rem; padding-bottom: 70px; }
+  .die { width: 44px; height: 44px; padding: 5px; gap: 2px; }
+  .pip { width: 6px; height: 6px; }
+  .play-area { padding: .65rem .5rem; gap: .5rem; }
+  .players-rail { padding: 0; }
+  .player-chip { padding: .25rem .4rem; }
+  .player-chip__avatar { display: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
+/* Touch device tweaks: bigger tap targets, no hover noise */
+@media (hover: none) {
+  .menu__btn:hover { transform: none; }
+  .die:hover:not(.disabled) { transform: none; box-shadow: 0 6px 0 rgba(0,0,0,.18), 0 10px 24px rgba(0,0,0,.3), inset 0 -3px 8px rgba(0,0,0,.12), inset 0 2px 0 rgba(255,255,255,.6); }
+  .die:active:not(.disabled) { transform: scale(.92); }
 }
