@@ -512,11 +512,29 @@ const startOnlineGame = () => {
     isAI: false,
     connected: !!s.conn || s.isHost,
   }));
-  // Tell every client the game is starting (they'll get full state right after)
-  G.online.slots.forEach(s => s.conn?.send({ t: 'start' }));
+  // Initialize host's game state FIRST so we can send the same state to clients
   startGame({ mode: 'online', players });
-  broadcastState();
+  // Now send the start signal WITH initial state in one message — no race
+  const initialStateForClients = buildStatePayload();
+  G.online.slots.forEach(s => {
+    if (s.conn && !s.isHost) {
+      try { s.conn.send({ t: 'start', state: initialStateForClients }); }
+      catch (err) { console.error('[online] send start failed:', err); }
+    }
+  });
 };
+
+const buildStatePayload = () => ({
+  players: G.players.map(p => ({ ...p })),
+  active: G.active,
+  round: G.round,
+  rollsLeft: G.rollsLeft,
+  dice: [...G.dice],
+  held: [...G.held],
+  hasRolled: G.hasRolled,
+  selected: G.selected,
+  sheets: G.sheets.map(s => ({ ...s })),
+});
 
 $('#hostNameInput').addEventListener('input', e => {
   const name = e.target.value.trim().slice(0, 14) || 'Host';
@@ -648,6 +666,10 @@ const attemptReconnect = () => {
 
 /* ---------- HOST: handle incoming client messages ---------- */
 const onHostMessage = (conn, msg) => {
+  if (msg.t === 'requestState') {
+    sendStartedStateTo(conn);
+    return;
+  }
   if (msg.t !== 'action' || G.mode !== 'online') return;
   // Find slot by connection
   const slot = G.online.slots.find(s => s.conn === conn);
@@ -661,6 +683,7 @@ const onHostMessage = (conn, msg) => {
 };
 
 /* ---------- CLIENT: handle incoming host messages ---------- */
+let stateRecvTimer = null;
 const onClientMessage = (msg) => {
   if (msg.t === 'welcome') {
     Toast.show('Joined room ' + msg.code, 'success');
@@ -668,9 +691,18 @@ const onClientMessage = (msg) => {
     Toast.show(msg.msg || 'Error', 'danger');
     showScreen('screenStart');
   } else if (msg.t === 'start') {
-    // Just signals "game is about to start"; real state arrives in 'state'
-    showScreen('screenGame');
+    if (msg.state) {
+      applyStateFromHost(msg.state); // already renders
+    } else {
+      showScreen('screenGame');
+      // Safety: request a resync if state never arrived in start
+      clearTimeout(stateRecvTimer);
+      stateRecvTimer = setTimeout(() => {
+        if (G.online?.conn?.open) G.online.conn.send({ t: 'requestState', playerId: myPlayerId });
+      }, 800);
+    }
   } else if (msg.t === 'state') {
+    clearTimeout(stateRecvTimer);
     applyStateFromHost(msg.state);
   } else if (msg.t === 'toast') {
     Toast.show(msg.text, msg.kind);
@@ -681,6 +713,10 @@ const onClientMessage = (msg) => {
 };
 
 const applyStateFromHost = (state) => {
+  if (!state || !Array.isArray(state.players)) {
+    console.error('[online] invalid state:', state);
+    return;
+  }
   // Preserve the local online context (peer/conn) — ONLY the game state changes.
   const online = G.online;
   G.mode = 'online';
@@ -748,35 +784,18 @@ const autoSkipTurn = () => {
 
 const broadcastState = () => {
   if (G.mode !== 'online' || !G.online?.isHost) return;
-  const state = {
-    players: G.players,
-    active: G.active,
-    round: G.round,
-    rollsLeft: G.rollsLeft,
-    dice: G.dice,
-    held: G.held,
-    hasRolled: G.hasRolled,
-    selected: G.selected,
-    sheets: G.sheets,
-  };
+  const state = buildStatePayload();
   G.online.slots.forEach((s) => {
-    if (s.conn && !s.isHost) s.conn.send({ t: 'state', state });
+    if (s.conn && !s.isHost) {
+      try { s.conn.send({ t: 'state', state }); }
+      catch (err) { console.error('[online] broadcast failed:', err); }
+    }
   });
 };
 
-const sendStartedStateTo = (conn, slotIdx) => {
-  const state = {
-    players: G.players,
-    active: G.active,
-    round: G.round,
-    rollsLeft: G.rollsLeft,
-    dice: G.dice,
-    held: G.held,
-    hasRolled: G.hasRolled,
-    selected: G.selected,
-    sheets: G.sheets,
-  };
-  conn.send({ t: 'state', state });
+const sendStartedStateTo = (conn) => {
+  try { conn.send({ t: 'state', state: buildStatePayload() }); }
+  catch (err) { console.error('[online] send state failed:', err); }
 };
 
 const teardownOnline = () => {
@@ -1080,6 +1099,8 @@ const advanceTurn = () => {
     return endGame();
   }
   renderAll();
+  // Sync turn change to all clients
+  if (G.mode === 'online' && G.online?.isHost) broadcastState();
   setTimeout(() => maybeAITurn(), 700);
 };
 
@@ -1219,12 +1240,13 @@ const endGame = () => {
       <span><b>${rank===0?'🥇':rank===1?'🥈':rank===2?'🥉':'  '} ${escapeHtml(p.name)}</b></span>
       <span class="winner">${p.score}</span>
     </div>`).join('');
+  const isOnlineClient = G.mode === 'online' && !G.online?.isHost;
   openModal(`
     <h2>Game Over</h2>
     <p><b style="color:${G.players[winnerIdx].color}">${escapeHtml(G.players[winnerIdx].name)}</b> wins with <b>${maxScore}</b>!</p>
     <div style="margin: 1rem 0">${podium}</div>
-    <div style="display:flex;gap:.5rem;justify-content:center">
-      <button class="btn primary" onclick="window.__playAgain()">Play Again</button>
+    <div style="display:flex;gap:.5rem;justify-content:center;flex-wrap:wrap">
+      ${isOnlineClient ? '<p style="text-align:center;width:100%;color:var(--text-dim)">Waiting for host…</p>' : '<button class="btn primary" onclick="window.__playAgain()">Play Again</button>'}
       <button class="btn ghost" onclick="window.__toMenu()">Main Menu</button>
     </div>
   `);
@@ -1240,7 +1262,19 @@ const endGame = () => {
 
 window.__playAgain = () => {
   closeModal();
-  startGame({ mode: G.mode, players: G.players.map(p => ({ ...p })) });
+  if (G.mode === 'online' && G.online?.isHost) {
+    // Reset sheets and broadcast new game to all clients
+    const players = G.players.map(p => ({ ...p, isYou: undefined }));
+    startGame({ mode: 'online', players });
+    const state = buildStatePayload();
+    G.online.slots.forEach(s => {
+      if (s.conn && !s.isHost) {
+        try { s.conn.send({ t: 'start', state }); } catch (err) { console.error(err); }
+      }
+    });
+  } else {
+    startGame({ mode: G.mode, players: G.players.map(p => ({ ...p })) });
+  }
 };
 window.__toMenu = () => { closeModal(); teardownOnline(); showScreen('screenStart'); };
 
