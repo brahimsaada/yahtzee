@@ -283,10 +283,15 @@ const openSetup = (mode) => {
 
   if (mode === 'online-create') {
     setPlayerCount(2);
+    $('#hostNameInput').value = myStoredName() || 'Host';
     initHost();
   } else if (mode === 'online-join') {
     $('#joinStatus').textContent = '';
     $('#joinCodeInput').value = '';
+    $('#joinNameInput').value = myStoredName() || '';
+    // Auto-fill code from URL hash (for share-link flow)
+    const m = location.hash.match(/#room=([A-Z0-9]{6})/i);
+    if (m) $('#joinCodeInput').value = m[1].toUpperCase();
   } else {
     setPlayerCount(mode === 'ai' ? 2 : 2);
   }
@@ -354,157 +359,424 @@ $('#btnStartGame').addEventListener('click', () => {
 
 /* ============================================================
    ONLINE (PeerJS - WebRTC peer-to-peer, free)
+   ============================================================
+   Architecture:
+   - Each device generates a stable `playerId` (UUID, persisted in localStorage)
+     so refreshing keeps the same identity.
+   - Host owns the player[] array and maps slot index <-> playerId.
+   - Clients send {t:'action', playerId, action}; host validates the playerId
+     matches G.players[G.active].playerId before applying.
+   - State broadcasts include the full player[] array (with playerId per slot).
+     Each client finds its own slot by matching playerId to localStorage one.
+   - On reconnect (same playerId joins again), host re-binds the new connection
+     to that existing slot — the player resumes their seat.
    ============================================================ */
+
+const myPlayerId = (() => {
+  let id = localStorage.getItem('yz_pid');
+  if (!id) {
+    id = 'p_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+    localStorage.setItem('yz_pid', id);
+  }
+  return id;
+})();
+const myStoredName = () => localStorage.getItem('yz_name') || '';
+const setStoredName = (n) => localStorage.setItem('yz_name', n);
+
 const genCode = () => {
   const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
   return Array.from({length:6}, () => chars[Math.random()*chars.length|0]).join('');
 };
 const peerIdFor = (code) => 'yzr-' + code.toLowerCase();
 
+/* ---------- HOST ---------- */
 const initHost = () => {
   const code = genCode();
   $('#roomCodeDisplay').textContent = code;
   $('#onlineStatus').textContent = 'Initializing…';
   $('#lobbyList').innerHTML = '';
+  $('#btnHostStart')?.remove();
 
   const peer = new Peer(peerIdFor(code));
-  G.online = { peer, conns: [], code, isHost: true, you: 0 };
+  // slots: array of { playerId, name, color, conn|null, isHost }
+  // Host always occupies slot 0.
+  const hostName = myStoredName() || 'Host';
+  G.online = {
+    peer, code, isHost: true,
+    slots: [{ playerId: myPlayerId, name: hostName, color: AVATAR_COLORS[0], conn: null, isHost: true }],
+    started: false,
+  };
 
   peer.on('open', () => {
     $('#onlineStatus').textContent = 'Waiting for players…';
-    addLobbyEntry('You (host)', AVATAR_COLORS[0], true);
+    renderLobby();
     showHostStartButton();
   });
   peer.on('error', (err) => {
-    $('#onlineStatus').textContent = 'Error: ' + err.type;
-    $('#onlineStatus').classList.add('error');
+    $('#onlineStatus').textContent = err.type === 'unavailable-id' ? 'Code taken — please go back and try again' : 'Error: ' + err.type;
+    $('#onlineStatus').className = 'status error';
   });
   peer.on('connection', (conn) => {
-    G.online.conns.push(conn);
     conn.on('open', () => {
-      const name = conn.metadata?.name || `Player ${G.online.conns.length + 1}`;
-      conn._playerName = name;
-      const idx = G.online.conns.length;
-      addLobbyEntry(name, AVATAR_COLORS[idx % AVATAR_COLORS.length], false);
-      Toast.show(`${name} joined`, 'success');
-      conn.send({ t: 'welcome', code });
+      const meta = conn.metadata || {};
+      const incomingId = meta.playerId;
+      const incomingName = (meta.name || 'Player').slice(0, 14);
+
+      // If game already started, only allow reconnects from known playerIds
+      if (G.online.started) {
+        const slot = G.online.slots.find(s => s.playerId === incomingId);
+        if (!slot) {
+          conn.send({ t: 'error', msg: 'Game already started' });
+          setTimeout(() => conn.close(), 100);
+          return;
+        }
+        slot.conn = conn;
+        const idx = G.online.slots.indexOf(slot);
+        if (G.players[idx]) G.players[idx].connected = true;
+        Toast.show(`${slot.name} reconnected`, 'success');
+        renderAll();
+        wireClientConn(conn);
+        sendStartedStateTo(conn, idx);
+        return;
+      }
+
+      // Pre-game: check capacity
+      if (G.online.slots.length >= 8) {
+        conn.send({ t: 'error', msg: 'Room is full' });
+        setTimeout(() => conn.close(), 100);
+        return;
+      }
+      // If this playerId already has a slot, reuse it (refresh case)
+      let slot = G.online.slots.find(s => s.playerId === incomingId);
+      if (slot) {
+        slot.conn = conn;
+        slot.name = incomingName;
+      } else {
+        const idx = G.online.slots.length;
+        slot = {
+          playerId: incomingId,
+          name: incomingName,
+          color: AVATAR_COLORS[idx % AVATAR_COLORS.length],
+          conn,
+          isHost: false,
+        };
+        G.online.slots.push(slot);
+      }
+      Toast.show(`${slot.name} joined`, 'success');
+      conn.send({ t: 'welcome', code, yourPlayerId: incomingId });
+      renderLobby();
+      wireClientConn(conn);
     });
-    conn.on('data', (msg) => onHostMessage(conn, msg));
-    conn.on('close', () => onConnClose(conn));
+    conn.on('error', () => {});
   });
 };
 
-const addLobbyEntry = (name, color, isHost) => {
-  const li = document.createElement('li');
-  li.innerHTML = `<span style="width:14px;height:14px;border-radius:50%;background:${color};display:inline-block"></span> ${escapeHtml(name)}${isHost ? ' <em style="color:var(--text-mute);font-style:normal">· host</em>' : ''}`;
-  $('#lobbyList').appendChild(li);
+const wireClientConn = (conn) => {
+  conn.on('data', (msg) => onHostMessage(conn, msg));
+  conn.on('close', () => onConnClose(conn));
+};
+
+const renderLobby = () => {
+  const list = $('#lobbyList');
+  list.innerHTML = '';
+  G.online.slots.forEach((s) => {
+    const li = document.createElement('li');
+    const isMe = s.playerId === myPlayerId;
+    const badges = [];
+    if (s.isHost) badges.push('host');
+    if (isMe) badges.push('you');
+    const badgeHtml = badges.length ? ` <em>· ${badges.join(' · ')}</em>` : '';
+    li.innerHTML = `<span class="lobby__dot" style="background:${s.color}"></span> ${escapeHtml(s.name)}${badgeHtml}`;
+    list.appendChild(li);
+  });
 };
 
 const showHostStartButton = () => {
-  let btn = $('#btnHostStart');
-  if (btn) return;
-  btn = document.createElement('button');
+  if ($('#btnHostStart')) return;
+  const btn = document.createElement('button');
   btn.id = 'btnHostStart';
-  btn.className = 'btn primary';
+  btn.className = 'btn primary big';
   btn.textContent = 'Start Game';
   btn.addEventListener('click', startOnlineGame);
   $('#onlineCreate').appendChild(btn);
 };
 
 const startOnlineGame = () => {
-  const players = [
-    { id: 'p0', name: 'You (host)', color: AVATAR_COLORS[0], isAI: false, isYou: true, connected: true },
-    ...G.online.conns.map((c, i) => ({
-      id: 'p' + (i+1), name: c._playerName, color: AVATAR_COLORS[(i+1) % AVATAR_COLORS.length],
-      isAI: false, peerId: c.peer, connected: true,
-    })),
-  ];
-  if (players.length < 2) { Toast.show('Need at least 2 players', 'danger'); return; }
-  // tell clients
-  G.online.conns.forEach(c => c.send({ t: 'start', players }));
-  startGame({ mode: 'online', players, isHost: true, you: 0 });
+  if (G.online.slots.length < 2) { Toast.show('Need at least 2 players', 'danger'); return; }
+  G.online.started = true;
+  const players = G.online.slots.map((s, i) => ({
+    id: 'p' + i,
+    playerId: s.playerId,
+    name: s.name,
+    color: s.color,
+    isAI: false,
+    connected: !!s.conn || s.isHost,
+  }));
+  // Tell every client the game is starting (they'll get full state right after)
+  G.online.slots.forEach(s => s.conn?.send({ t: 'start' }));
+  startGame({ mode: 'online', players });
+  broadcastState();
 };
+
+$('#hostNameInput').addEventListener('input', e => {
+  const name = e.target.value.trim().slice(0, 14) || 'Host';
+  setStoredName(name);
+  if (G.online?.isHost && G.online.slots[0]) {
+    G.online.slots[0].name = name;
+    renderLobby();
+  }
+});
+
+$('#btnShareLink').addEventListener('click', async () => {
+  const url = location.origin + location.pathname + '#room=' + $('#roomCodeDisplay').textContent;
+  try {
+    if (navigator.share) await navigator.share({ title: 'Yahtzee Royale', text: 'Join my game', url });
+    else { await navigator.clipboard.writeText(url); Toast.show('Link copied', 'success'); }
+  } catch {}
+});
 
 $('#btnCopyCode').addEventListener('click', async () => {
-  await navigator.clipboard.writeText($('#roomCodeDisplay').textContent);
-  Toast.show('Code copied', 'success');
+  try {
+    await navigator.clipboard.writeText($('#roomCodeDisplay').textContent);
+    Toast.show('Code copied', 'success');
+  } catch {
+    Toast.show('Copy failed — long-press to copy', 'danger');
+  }
 });
 
-$('#btnDoJoin').addEventListener('click', () => {
+/* ---------- CLIENT (joiner) ---------- */
+$('#btnDoJoin').addEventListener('click', () => doJoin());
+
+const doJoin = () => {
   const code = $('#joinCodeInput').value.trim().toUpperCase();
-  if (code.length !== 6) { $('#joinStatus').textContent = 'Enter a 6-character code'; $('#joinStatus').className = 'status error'; return; }
-  $('#joinStatus').textContent = 'Connecting…'; $('#joinStatus').className = 'status';
+  if (code.length !== 6) {
+    $('#joinStatus').textContent = 'Enter a 6-character code';
+    $('#joinStatus').className = 'status error';
+    return;
+  }
+  let name = $('#joinNameInput').value.trim().slice(0, 14);
+  if (!name) name = myStoredName() || prompt('Your name?', 'Player') || 'Player';
+  setStoredName(name);
+
+  $('#joinStatus').textContent = 'Connecting…';
+  $('#joinStatus').className = 'status';
+
+  // Tear down any previous peer
+  try { G.online?.peer?.destroy(); } catch {}
 
   const peer = new Peer();
-  G.online = { peer, conn: null, code, isHost: false, you: null };
+  G.online = {
+    peer, code, isHost: false,
+    conn: null, you: null,
+    myName: name, myPlayerId,
+  };
 
   peer.on('open', () => {
-    const name = prompt('Your name?', 'Player') || 'Player';
-    const conn = peer.connect(peerIdFor(code), { metadata: { name }, reliable: true });
+    const conn = peer.connect(peerIdFor(code), {
+      metadata: { name, playerId: myPlayerId },
+      reliable: true,
+    });
     G.online.conn = conn;
-    G.online.myName = name;
-    conn.on('open', () => { $('#joinStatus').textContent = 'Connected, waiting for host…'; $('#joinStatus').className = 'status success'; });
+
+    let opened = false;
+    conn.on('open', () => {
+      opened = true;
+      $('#joinStatus').textContent = 'Connected — waiting for host to start…';
+      $('#joinStatus').className = 'status success';
+    });
     conn.on('data', (msg) => onClientMessage(msg));
-    conn.on('close', () => { Toast.show('Disconnected from host', 'danger'); showScreen('screenStart'); });
+    conn.on('close', () => {
+      if (!opened) {
+        $('#joinStatus').textContent = 'Could not connect';
+        $('#joinStatus').className = 'status error';
+        return;
+      }
+      handleClientDisconnect();
+    });
+    conn.on('error', () => {});
+
+    // Connection timeout
+    setTimeout(() => {
+      if (!opened) {
+        $('#joinStatus').textContent = 'Connection timed out';
+        $('#joinStatus').className = 'status error';
+        try { conn.close(); peer.destroy(); } catch {}
+      }
+    }, 12000);
   });
+
   peer.on('error', (err) => {
-    $('#joinStatus').textContent = err.type === 'peer-unavailable' ? 'Room not found' : 'Error: ' + err.type;
+    const map = {
+      'peer-unavailable': 'Room not found — check the code',
+      'network': 'Network error — check your connection',
+      'server-error': 'Broker server error — try again',
+    };
+    $('#joinStatus').textContent = map[err.type] || ('Error: ' + err.type);
     $('#joinStatus').className = 'status error';
   });
-});
-
-const onHostMessage = (conn, msg) => {
-  if (msg.t === 'action' && G.mode === 'online') {
-    // validate then apply
-    const playerIdx = G.online.conns.indexOf(conn) + 1;
-    if (playerIdx !== G.active) return; // out of turn
-    applyAction(msg.action);
-    broadcastState();
-  }
 };
 
+const handleClientDisconnect = () => {
+  Toast.show('Lost connection to host. Attempting to reconnect…', 'danger');
+  if ($('#screenGame').classList.contains('hidden')) {
+    showScreen('screenStart');
+    return;
+  }
+  // Try to reconnect using the same code
+  setTimeout(() => attemptReconnect(), 1500);
+};
+
+const attemptReconnect = () => {
+  if (!G.online || G.online.isHost) return;
+  const code = G.online.code;
+  try { G.online.peer?.destroy(); } catch {}
+  const peer = new Peer();
+  G.online.peer = peer;
+  peer.on('open', () => {
+    const conn = peer.connect(peerIdFor(code), {
+      metadata: { name: G.online.myName, playerId: myPlayerId },
+      reliable: true,
+    });
+    G.online.conn = conn;
+    conn.on('open', () => Toast.show('Reconnected', 'success'));
+    conn.on('data', (msg) => onClientMessage(msg));
+    conn.on('close', handleClientDisconnect);
+    conn.on('error', () => {});
+  });
+  peer.on('error', () => Toast.show('Reconnect failed', 'danger'));
+};
+
+/* ---------- HOST: handle incoming client messages ---------- */
+const onHostMessage = (conn, msg) => {
+  if (msg.t !== 'action' || G.mode !== 'online') return;
+  // Find slot by connection
+  const slot = G.online.slots.find(s => s.conn === conn);
+  if (!slot) return;
+  const slotIdx = G.online.slots.indexOf(slot);
+  // Validate: sender must be the active player
+  if (slotIdx !== G.active) return;
+  if (msg.playerId !== slot.playerId) return; // identity mismatch
+  applyAction(msg.action);
+  broadcastState();
+};
+
+/* ---------- CLIENT: handle incoming host messages ---------- */
 const onClientMessage = (msg) => {
   if (msg.t === 'welcome') {
     Toast.show('Joined room ' + msg.code, 'success');
+  } else if (msg.t === 'error') {
+    Toast.show(msg.msg || 'Error', 'danger');
+    showScreen('screenStart');
   } else if (msg.t === 'start') {
-    msg.players.forEach((p, i) => { if (p.name === G.online.myName && i > 0) p.isYou = true; });
-    // actually: client is whichever index its conn is on host side; host will send `you`
-    startGame({ mode: 'online', players: msg.players, isHost: false, you: null });
-    // figure out 'you' by name match (good enough for now; host sends explicit on next state)
-    G.online.you = msg.players.findIndex((p, i) => i > 0 && p.name === G.online.myName);
-    if (G.online.you < 0) G.online.you = 1;
-    G.players[G.online.you].isYou = true;
-    renderAll();
+    // Just signals "game is about to start"; real state arrives in 'state'
+    showScreen('screenGame');
   } else if (msg.t === 'state') {
-    const online = G.online;
-    Object.assign(G, msg.state);
-    G.online = online;
-    if (G.online.you === null && msg.you !== undefined) G.online.you = msg.you;
-    renderAll();
-    // detect game over on client
-    if (G.players.every((_, i) => sheetComplete(G.sheets[i]))) endGame();
+    applyStateFromHost(msg.state);
   } else if (msg.t === 'toast') {
     Toast.show(msg.text, msg.kind);
+  } else if (msg.t === 'gameover') {
+    applyStateFromHost(msg.state);
+    endGame();
   }
 };
 
+const applyStateFromHost = (state) => {
+  // Preserve the local online context (peer/conn) — ONLY the game state changes.
+  const online = G.online;
+  G.mode = 'online';
+  G.players = state.players;
+  G.active = state.active;
+  G.round = state.round;
+  G.rollsLeft = state.rollsLeft;
+  G.dice = state.dice;
+  G.held = state.held;
+  G.hasRolled = state.hasRolled;
+  G.selected = state.selected;
+  G.sheets = state.sheets;
+  G.online = online;
+  // Resolve "you" by matching playerId
+  G.online.you = G.players.findIndex(p => p.playerId === myPlayerId);
+  if (G.online.you >= 0) G.players[G.online.you].isYou = true;
+  if ($('#screenGame').classList.contains('hidden')) showScreen('screenGame');
+  renderAll();
+};
+
+/* ---------- HOST: connection close handling ---------- */
 const onConnClose = (conn) => {
-  if (!G.players?.length) return;
-  const idx = G.online.conns.indexOf(conn) + 1;
-  if (G.players[idx]) {
-    G.players[idx].connected = false;
-    Toast.show(`${G.players[idx].name} disconnected`, 'danger');
-    if (G.active === idx) advanceTurn(); // skip
-    renderAll();
-    broadcastState();
+  if (!G.online) return;
+  const slot = G.online.slots.find(s => s.conn === conn);
+  if (!slot) return;
+  slot.conn = null;
+  if (G.online.started) {
+    const idx = G.online.slots.indexOf(slot);
+    if (G.players[idx]) {
+      G.players[idx].connected = false;
+      Toast.show(`${slot.name} disconnected`, 'danger');
+      // Skip their turn if they were active
+      if (G.active === idx) {
+        // Auto-pick worst category to keep game moving (or wait?)
+        // Better: simply skip after a grace period
+        setTimeout(() => {
+          if (G.active === idx && !G.players[idx].connected) autoSkipTurn();
+        }, 8000);
+      }
+      renderAll();
+      broadcastState();
+    }
+  } else {
+    // Not yet started: remove from lobby
+    const i = G.online.slots.indexOf(slot);
+    G.online.slots.splice(i, 1);
+    // Reassign colors so they remain consistent
+    G.online.slots.forEach((s, k) => { s.color = AVATAR_COLORS[k % AVATAR_COLORS.length]; });
+    renderLobby();
+    Toast.show(`${slot.name} left`, 'danger');
   }
+};
+
+const autoSkipTurn = () => {
+  // Score zero in the first available category to skip a disconnected player
+  const sheet = G.sheets[G.active];
+  const open = CATEGORIES.find(c => sheet[c.id] === undefined);
+  if (!open) return;
+  // Roll once if hasn't rolled, then auto-zero
+  if (!G.hasRolled) doRoll();
+  G.selected = open.id;
+  doConfirm();
+  broadcastState();
 };
 
 const broadcastState = () => {
   if (G.mode !== 'online' || !G.online?.isHost) return;
-  const snapshot = { mode: G.mode, players: G.players, active: G.active, round: G.round, rollsLeft: G.rollsLeft,
-    dice: G.dice, held: G.held, hasRolled: G.hasRolled, selected: G.selected, sheets: G.sheets };
-  G.online.conns.forEach((c, i) => c.send({ t: 'state', state: snapshot, you: i + 1 }));
+  const state = {
+    players: G.players,
+    active: G.active,
+    round: G.round,
+    rollsLeft: G.rollsLeft,
+    dice: G.dice,
+    held: G.held,
+    hasRolled: G.hasRolled,
+    selected: G.selected,
+    sheets: G.sheets,
+  };
+  G.online.slots.forEach((s) => {
+    if (s.conn && !s.isHost) s.conn.send({ t: 'state', state });
+  });
+};
+
+const sendStartedStateTo = (conn, slotIdx) => {
+  const state = {
+    players: G.players,
+    active: G.active,
+    round: G.round,
+    rollsLeft: G.rollsLeft,
+    dice: G.dice,
+    held: G.held,
+    hasRolled: G.hasRolled,
+    selected: G.selected,
+    sheets: G.sheets,
+  };
+  conn.send({ t: 'state', state });
 };
 
 const teardownOnline = () => {
@@ -516,20 +788,28 @@ const teardownOnline = () => {
 /* ============================================================
    START GAME
    ============================================================ */
-function startGame({ mode, players, isHost = false, you = null }) {
+function startGame({ mode, players }) {
+  // Preserve online context across resets
+  const online = G.online;
   G = initialState();
   G.mode = mode;
   G.players = players;
   G.sheets = players.map(() => ({}));
+  G.online = online;
+
   if (mode === 'online') {
-    if (G.online) { G.online.isHost = isHost; G.online.you = you; }
-    else G.online = { isHost, you };
-  }
-  if (mode === 'local' || mode === 'ai') {
-    // mark first human as 'you' for stats
+    // Mark "you" by playerId match
+    const youIdx = players.findIndex(p => p.playerId === myPlayerId);
+    if (youIdx >= 0) {
+      players[youIdx].isYou = true;
+      if (G.online) G.online.you = youIdx;
+    }
+  } else {
+    // Local / AI: mark first human as 'you' for stats
     const idx = players.findIndex(p => !p.isAI);
     if (idx >= 0) players[idx].isYou = true;
   }
+
   prevSnapshot = null;
   showScreen('screenGame');
   renderAll();
@@ -676,20 +956,23 @@ const canIControl = () => {
   return G.online.isHost || G.online.you === G.active;
 };
 
-// True if the local user controls THIS specific player slot (for online: AI on host, or yourself).
+// True if the local user controls THIS specific player slot.
+// Online: only the player whose playerId matches the slot can control it.
 const isMyTurnToControl = (idx) => {
   if (G.mode !== 'online') return idx === G.active;
-  if (G.online.isHost) {
-    // host controls slot 0, plus AI players (currently no AI in online)
-    return idx === 0 && G.active === 0;
-  }
-  return G.online.you === idx && G.active === idx;
+  if (idx !== G.active) return false;
+  const slot = G.players[idx];
+  return slot && slot.playerId === myPlayerId;
 };
 
 const sendAction = (action) => {
   if (G.mode !== 'online') return applyAction(action);
-  if (G.online.isHost) { applyAction(action); broadcastState(); }
-  else G.online.conn.send({ t: 'action', action });
+  if (G.online.isHost) {
+    applyAction(action);
+    broadcastState();
+  } else if (G.online.conn?.open) {
+    G.online.conn.send({ t: 'action', playerId: myPlayerId, action });
+  }
 };
 
 const applyAction = (action) => {
@@ -946,7 +1229,13 @@ const endGame = () => {
     </div>
   `);
 
-  if (G.mode === 'online' && G.online?.isHost) broadcastState();
+  if (G.mode === 'online' && G.online?.isHost) {
+    const state = {
+      players: G.players, active: G.active, round: G.round, rollsLeft: G.rollsLeft,
+      dice: G.dice, held: G.held, hasRolled: G.hasRolled, selected: G.selected, sheets: G.sheets,
+    };
+    G.online.slots.forEach(s => { if (s.conn && !s.isHost) s.conn.send({ t: 'gameover', state }); });
+  }
 };
 
 window.__playAgain = () => {
@@ -1037,3 +1326,8 @@ $('#btnSound').addEventListener('click', () => { Sound.toggle(); updateSoundBtn(
 
 /* ---------- INIT ---------- */
 showScreen('screenStart');
+
+// Auto-open Join screen if URL has #room=CODE
+if (/#room=[A-Z0-9]{6}/i.test(location.hash)) {
+  setTimeout(() => openSetup('online-join'), 100);
+}
