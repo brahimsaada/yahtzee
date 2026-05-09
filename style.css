@@ -303,7 +303,7 @@ kbd { font-family: 'JetBrains Mono', monospace; font-size: .82em; background: va
   display: grid; gap: .75rem;
   text-align: center;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
 }
 .play-area::before {
   content: ""; position: absolute; inset: 0;
