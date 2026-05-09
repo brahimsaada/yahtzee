@@ -705,7 +705,7 @@ kbd { font-family: 'JetBrains Mono', monospace; font-size: .82em; background: va
 
   /* Play area */
   .play-area { padding: 1rem .5rem; gap: .75rem; border-radius: 18px; }
-  .dice-tray { gap: .55rem; min-height: 60px; }
+  .dice-tray { gap: .55rem; min-height: 100px; }
   .die { --size: 56px; }
   .rolls-left { font-size: .8rem; }
   .rolls-left .pip-dot { width: 8px; height: 8px; }
