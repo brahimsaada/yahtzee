@@ -687,7 +687,7 @@ kbd { font-family: 'JetBrains Mono', monospace; font-size: .82em; background: va
   .field input[type="text"] { font-size: 1rem; padding: .75em .9em; }
 
   /* Game screen: tighter, with bottom-fixed actions */
-  .screen--game { padding: .4rem; gap: .4rem; padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
+  .screen--game { padding: .4rem; gap: .4rem; padding-bottom: calc(90px + env(safe-area-inset-bottom)); }
   .topbar { padding: 0; gap: .5rem; }
   .icon { width: 40px; height: 40px; font-size: 1.15rem; }
   .turn-info__round { font-size: .7rem; }
