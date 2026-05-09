@@ -225,7 +225,25 @@ kbd { font-family: 'JetBrains Mono', monospace; font-size: .82em; background: va
 @media (min-width: 900px) {
   .screen--game { padding: 1rem 1.25rem; gap: .75rem; height: 100vh; height: 100dvh; }
   .game-grid { grid-template-columns: minmax(340px, 420px) 1fr; align-items: stretch; min-height: 0; }
-  .play-area { align-self: start; }
+  .play-area { align-self: stretch; }
+
+  /* Quincunx: 5 dice in a "5" face pattern */
+  .dice-tray {
+    display: grid;
+    grid-template-columns: repeat(3, auto);
+    grid-template-rows: repeat(3, auto);
+    justify-content: center;
+    align-content: center;
+    gap: 1rem;
+    flex: 1;
+    min-height: 0;
+  }
+  .dice-tray .die:nth-child(1) { grid-column: 1; grid-row: 1; }
+  .dice-tray .die:nth-child(2) { grid-column: 3; grid-row: 1; }
+  .dice-tray .die:nth-child(3) { grid-column: 2; grid-row: 2; }
+  .dice-tray .die:nth-child(4) { grid-column: 1; grid-row: 3; }
+  .dice-tray .die:nth-child(5) { grid-column: 3; grid-row: 3; }
+  .die { --size: 76px; }
 }
 
 .players-rail {
@@ -469,8 +487,10 @@ kbd { font-family: 'JetBrains Mono', monospace; font-size: .82em; background: va
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   overflow: auto; flex: 1; min-height: 0;
+  display: flex; flex-direction: column;
 }
-.scoresheet table { border-collapse: separate; border-spacing: 0; width: 100%; min-width: 100%; }
+.scoresheet table { border-collapse: separate; border-spacing: 0; width: 100%; min-width: 100%; height: 100%; }
+.scoresheet tbody { height: 100%; }
 .scoresheet th, .scoresheet td {
   padding: .15em .55em; text-align: center;
   font-family: 'JetBrains Mono', monospace; font-size: .9rem;
