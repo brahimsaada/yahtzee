@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0c2a25" />
+<title>Yahtzee · Royale</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,700;9..144,900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ===== START SCREEN ===== -->
+<section class="screen screen--start" id="screenStart">
+  <div class="brand">
+    <div class="brand__mark" aria-hidden="true">
+      <svg viewBox="0 0 80 80" width="64" height="64"><rect x="6" y="6" width="68" height="68" rx="14" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="26" cy="26" r="5" fill="currentColor"/><circle cx="54" cy="26" r="5" fill="currentColor"/><circle cx="40" cy="40" r="5" fill="currentColor"/><circle cx="26" cy="54" r="5" fill="currentColor"/><circle cx="54" cy="54" r="5" fill="currentColor"/></svg>
+    </div>
+    <h1 class="brand__title">Yahtzee<span>Royale</span></h1>
+    <p class="brand__tag">Roll. Strategize. Win.</p>
+  </div>
+
+  <div class="card card--menu">
+    <div class="menu">
+      <button class="menu__btn" data-mode="local">
+        <span class="menu__icon">🎲</span>
+        <span><b>Local Play</b><em>Pass-and-play, 2–8 players</em></span>
+      </button>
+      <button class="menu__btn" data-mode="ai">
+        <span class="menu__icon">🤖</span>
+        <span><b>vs Computer</b><em>1–3 AI opponents · 3 difficulties</em></span>
+      </button>
+      <button class="menu__btn" data-mode="online-create">
+        <span class="menu__icon">🌐</span>
+        <span><b>Create Online Room</b><em>Free P2P · share a code</em></span>
+      </button>
+      <button class="menu__btn" data-mode="online-join">
+        <span class="menu__icon">🔗</span>
+        <span><b>Join Online Room</b><em>Enter a 6-letter code</em></span>
+      </button>
+    </div>
+    <div class="menu__foot">
+      <button class="link" id="btnStats">📊 Stats</button>
+      <button class="link" id="btnHistory">📜 History</button>
+      <button class="link" id="btnAchievements">🏆 Achievements</button>
+      <button class="link" id="btnTheme">🌓 Theme</button>
+      <button class="link" id="btnSound">🔊 Sound</button>
+      <button class="link" id="btnRules">📖 Rules</button>
+    </div>
+  </div>
+  <p class="foot">v1.0 · keyboard: <kbd>Space</kbd> roll · <kbd>1-5</kbd> hold · <kbd>Enter</kbd> confirm</p>
+</section>
+
+<!-- ===== SETUP SCREEN ===== -->
+<section class="screen screen--setup hidden" id="screenSetup">
+  <div class="card">
+    <button class="back" data-back>‹ Back</button>
+    <h2 id="setupTitle">Local Play</h2>
+    <div class="setup">
+      <label class="field">
+        <span>Number of players</span>
+        <div class="counter" data-counter="players">
+          <button class="counter__btn" data-step="-1">−</button>
+          <output id="playerCount">2</output>
+          <button class="counter__btn" data-step="1">+</button>
+        </div>
+      </label>
+      <div id="playerList" class="players-setup"></div>
+      <div id="aiSettings" class="hidden">
+        <label class="field"><span>AI difficulty</span>
+          <div class="seg" data-seg="difficulty">
+            <button data-val="easy">Easy</button>
+            <button data-val="medium" class="active">Medium</button>
+            <button data-val="hard">Hard</button>
+          </div>
+        </label>
+      </div>
+      <div id="onlineCreate" class="hidden online-box">
+        <p>Your room code:</p>
+        <div class="room-code" id="roomCodeDisplay">······</div>
+        <button class="btn ghost" id="btnCopyCode">📋 Copy code</button>
+        <p class="status" id="onlineStatus">Initializing…</p>
+        <ul class="lobby" id="lobbyList"></ul>
+      </div>
+      <div id="onlineJoin" class="hidden online-box">
+        <label class="field"><span>Room code</span>
+          <input type="text" id="joinCodeInput" maxlength="6" placeholder="ABC123" autocapitalize="characters" />
+        </label>
+        <button class="btn primary" id="btnDoJoin">Join Room</button>
+        <p class="status" id="joinStatus"></p>
+      </div>
+      <button class="btn primary big" id="btnStartGame">Start Game</button>
+    </div>
+  </div>
+</section>
+
+<!-- ===== GAME SCREEN ===== -->
+<section class="screen screen--game hidden" id="screenGame">
+  <header class="topbar">
+    <button class="icon" id="btnMenu" aria-label="Menu">☰</button>
+    <div class="turn-info">
+      <span class="turn-info__round">Round <b id="roundNum">1</b>/13</span>
+      <span class="turn-info__active" id="activeTurn">— rolling —</span>
+    </div>
+    <button class="icon" id="btnUndo" aria-label="Undo turn" title="Undo last turn">↶</button>
+  </header>
+
+  <div class="players-rail" id="playersRail"></div>
+
+  <div class="play-area">
+    <div class="dice-tray" id="diceTray" role="group" aria-label="Dice"></div>
+    <div class="rolls-left" id="rollsLeft">3 rolls left</div>
+    <div class="actions">
+      <button class="btn primary big" id="btnRoll">🎲 Roll</button>
+      <button class="btn success big hidden" id="btnConfirm">✓ Confirm Score</button>
+    </div>
+  </div>
+
+  <section class="scoresheet" id="scoresheet" aria-label="Scoresheet"></section>
+</section>
+
+<!-- ===== MODALS ===== -->
+<div class="modal hidden" id="modal" role="dialog" aria-modal="true">
+  <div class="modal__panel">
+    <button class="modal__close" data-modal-close aria-label="Close">×</button>
+    <div class="modal__body" id="modalBody"></div>
+  </div>
+</div>
+
+<!-- ===== TOAST ===== -->
+<div class="toast-stack" id="toastStack" aria-live="polite"></div>
+
+<!-- ===== CONFETTI ===== -->
+<canvas id="confetti" class="confetti hidden"></canvas>
+
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
