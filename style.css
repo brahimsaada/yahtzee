@@ -715,15 +715,14 @@ kbd { font-family: 'JetBrains Mono', monospace; font-size: .82em; background: va
   .field input[type="text"] { font-size: 1rem; padding: .75em .9em; }
   .players-setup { max-height: 200px; }
 
-  /* === GAME SCREEN: full-height column layout with fixed bottom bar === */
+  /* === GAME SCREEN: simple flex column, no fixed bars === */
   .screen--game {
-    padding: .4rem;
-    gap: .35rem;
+    padding: .5rem;
+    gap: .5rem;
     height: 100vh;
     height: 100dvh;
     overflow: hidden;
-    /* Reserve space for the fixed action bar at the bottom */
-    padding-bottom: calc(var(--action-bar-h) + env(safe-area-inset-bottom));
+    padding-bottom: calc(.5rem + env(safe-area-inset-bottom));
   }
   .topbar { padding: 0 .15rem; gap: .5rem; flex-shrink: 0; }
   .icon { width: 40px; height: 40px; font-size: 1.15rem; }
@@ -733,7 +732,7 @@ kbd { font-family: 'JetBrains Mono', monospace; font-size: .82em; background: va
   /* Players rail */
   .players-rail {
     gap: .4rem;
-    padding: .55rem .15rem .35rem; /* keep top room for YOU badge */
+    padding: .65rem .15rem .35rem;
     flex-shrink: 0;
   }
   .player-chip { padding: .4rem .6rem; gap: .45rem; border-radius: 12px; }
@@ -746,26 +745,28 @@ kbd { font-family: 'JetBrains Mono', monospace; font-size: .82em; background: va
   .player-chip.active .player-chip__score { font-size: 1.3rem; }
   .player-chip.you::before { font-size: .5rem; padding: 1px 5px; top: -6px; right: 6px; }
 
-  /* === Grid: play area is auto height, scoresheet fills rest === */
+  /* === Grid: play area gets only what it needs, scoresheet takes the rest === */
   .game-grid {
-    display: grid;
-    gap: .35rem;
-    grid-template-rows: auto 1fr;
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
     flex: 1;
     min-height: 0;
     overflow: hidden;
   }
 
-  /* Play area: compact, no flex stretch — content height only */
+  /* Play area: roomy enough for dice + button to breathe */
   .play-area {
-    padding: .55rem .5rem;
-    gap: .45rem;
-    border-radius: 16px;
+    padding: 1rem .75rem;
+    gap: .75rem;
+    border-radius: 18px;
     flex-shrink: 0;
     min-height: 0;
   }
+  /* Hide the gradient overlay that was clipping dice */
+  .play-area::before { display: none; }
 
-  /* === DICE: flex row, never wrap, scale to fit width === */
+  /* === DICE: flex row, never wrap, comfortable size === */
   .dice-tray {
     display: flex;
     flex-direction: row;
@@ -774,50 +775,39 @@ kbd { font-family: 'JetBrains Mono', monospace; font-size: .82em; background: va
     align-items: center;
     gap: .5rem;
     perspective: 800px;
-    padding: .25rem 0;
+    padding: .35rem 0;
     width: 100%;
   }
-  /* Dice size scales with viewport — guarantees 5 fit horizontally with gaps */
   .die {
-    --size: min(56px, calc((100vw - 4.5rem) / 5));
+    --size: min(54px, calc((100vw - 5rem) / 5));
   }
 
   .rolls-left { font-size: .78rem; }
   .rolls-left .pip-dot { width: 8px; height: 8px; }
 
-  /* === FIXED ACTION BAR at bottom === */
+  /* Action buttons: inline, full-width inside play area */
   .actions {
-    position: fixed;
-    left: 0; right: 0; bottom: 0;
-    background: rgba(10, 31, 28, .92);
-    border-top: 1px solid var(--border-hi);
-    padding: .65rem .9rem;
-    padding-bottom: calc(.65rem + env(safe-area-inset-bottom));
-    z-index: 50;
-    box-shadow: 0 -8px 32px rgba(0,0,0,.3);
-    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
     gap: .6rem;
-    flex-wrap: nowrap;
     width: 100%;
+    flex-wrap: nowrap;
   }
-  [data-theme="light"] .actions { background: rgba(244, 237, 224, .95); }
-  [data-theme="midnight"] .actions { background: rgba(6, 8, 20, .95); }
   .actions .btn { flex: 1; font-size: .92rem; padding: .85em .75em; }
   .btn.big { padding: .85em 1rem; font-size: .92rem; }
 
-  /* === Scoresheet: fills remaining space, scrolls internally === */
+  /* Scoresheet: fills remaining space, scrolls internally */
   .scoresheet {
     border-radius: 16px;
     min-height: 0;
+    flex: 1;
     overflow: auto;
     -webkit-overflow-scrolling: touch;
   }
-  .scoresheet th, .scoresheet td { padding: .25em .4em; font-size: .74rem; height: 24px; white-space: nowrap; }
-  .scoresheet th.cat-head, .scoresheet td.cat-name { min-width: 88px; font-size: .7rem; }
-  .scoresheet tr.subtotal-bonus td { font-size: .8rem; height: 28px; }
-  .scoresheet tr.subtotal-bonus td.cat-name { font-size: .66rem; }
-  .scoresheet tr.total td { font-size: .88rem; height: 32px; }
-  .scoresheet tr.total td.cat-name { font-size: .7rem; }
+  .scoresheet th, .scoresheet td { padding: .3em .4em; font-size: .76rem; height: 26px; white-space: nowrap; }
+  .scoresheet th.cat-head, .scoresheet td.cat-name { min-width: 92px; font-size: .72rem; }
+  .scoresheet tr.subtotal-bonus td { font-size: .82rem; height: 30px; }
+  .scoresheet tr.subtotal-bonus td.cat-name { font-size: .68rem; }
+  .scoresheet tr.total td { font-size: .9rem; height: 34px; }
+  .scoresheet tr.total td.cat-name { font-size: .72rem; }
 
   /* Modal: bottom sheet */
   .modal { padding: 0; align-items: flex-end; }
@@ -870,19 +860,14 @@ kbd { font-family: 'JetBrains Mono', monospace; font-size: .82em; background: va
 
 /* ============ LANDSCAPE PHONE ============ */
 @media (max-height: 480px) and (orientation: landscape) {
-  :root { --action-bar-h: 60px; }
   .screen--game { padding: .3rem; gap: .25rem; }
-  .die { --size: min(42px, calc((100vh - 14rem) / 1)); }
-  .play-area { padding: .4rem; gap: .35rem; }
+  .die { --size: 42px; }
+  .play-area { padding: .5rem; gap: .35rem; }
   .rolls-left { display: none; }
   .players-rail { gap: .3rem; padding: .35rem .15rem .2rem; }
   .player-chip__avatar { width: 24px; height: 24px; font-size: .75rem; }
   .player-chip { padding: .25rem .4rem; gap: .3rem; }
-  .actions {
-    padding: .35rem .75rem;
-    padding-bottom: calc(.35rem + env(safe-area-inset-bottom));
-  }
-  .actions .btn { padding: .55em .75em; }
+  .actions .btn { padding: .55em .75em; font-size: .85rem; }
 }
 
 /* ============ REDUCED MOTION ============ */
