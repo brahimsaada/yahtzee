@@ -264,7 +264,8 @@ const openSetup = (mode) => {
   $('#onlineJoin').classList.toggle('hidden', mode !== 'online-join');
   $('#playerList').classList.toggle('hidden', mode === 'online-join');
   $('#btnStartGame').classList.toggle('hidden', mode === 'online-join' || mode === 'online-create');
-
+  // Hide the "Number of players" counter on Join screen — it has no purpose there
+  $('[data-counter="players"]').closest('.field').classList.toggle('hidden', mode === 'online-join');
   const titleMap = { local:'Local Play', ai:'vs Computer', 'online-create':'Create Online Room', 'online-join':'Join Online Room' };
   $('#setupTitle').textContent = titleMap[mode];
 
@@ -1138,7 +1139,12 @@ applyTheme();
 $('#btnTheme').addEventListener('click', () => { themeIdx = (themeIdx+1)%themes.length; applyTheme(); Toast.show(`Theme: ${themes[themeIdx]}`); });
 
 /* ---------- SOUND TOGGLE ---------- */
-const updateSoundBtn = () => $('#btnSound').textContent = Sound.isOn() ? '🔊 Sound' : '🔇 Sound';
+const updateSoundBtn = () => {
+  const btn = $('#btnSound');
+  btn.classList.toggle('sound-off', !Sound.isOn());
+  const label = btn.querySelector('span');
+  if (label) label.textContent = Sound.isOn() ? 'Sound' : 'Muted';
+};
 updateSoundBtn();
 $('#btnSound').addEventListener('click', () => { Sound.toggle(); updateSoundBtn(); });
 
